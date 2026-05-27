@@ -1,8 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
 import { AppShell } from "@/components/AppShell";
 import { useApp } from "@/lib/store";
 import { ConfidenceBar, IntentChip, StageBadge } from "@/components/atoms";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useMemo, useState } from "react";
 import { formatDistanceToNow } from "date-fns";
@@ -46,6 +48,9 @@ function LeadsPage() {
             <p className="text-sm text-muted-foreground">{filtered.length} of {leads.length} · ranked by deal probability</p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
+            <Link to="/leads/add">
+              <Button size="sm">Add lead</Button>
+            </Link>
             <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name or phone…" className="h-9 w-56 text-sm" />
             <Select value={stage} onValueChange={setStage}>
               <SelectTrigger className="h-9 w-44 text-sm"><SelectValue /></SelectTrigger>
