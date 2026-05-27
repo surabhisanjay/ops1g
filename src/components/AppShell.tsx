@@ -10,6 +10,7 @@ import { ProfileMenu } from "./ProfileMenu";
 import { useApp } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 import type { ReactNode } from "react";
 import { LeadControlPanel } from "./LeadControlPanel";
 import { CommandPalette } from "./CommandPalette";
@@ -122,7 +123,8 @@ export function AppShell({ children }: { children: ReactNode }) {
     "flow-ops": [
       { to: "/today", label: "Today", icon: Sun, badge: queue.length },
       { to: "/inbox", label: "Inbox", icon: Inbox },
-      { to: "/myt/leads", label: "Leads", icon: Target, accent: true },
+      { to: "/leads", label: "Leads", icon: Target, accent: true },
+      { to: "/myt/leads", label: "CRM leads", icon: Target },
       { to: "/myt/schedule", label: "Schedule", icon: CalendarPlus },
       { to: "/calendar", label: "Calendar", icon: Calendar },
       { to: "/myt/marketplace", label: "Marketplace", icon: Store },
@@ -278,6 +280,9 @@ export function AppShell({ children }: { children: ReactNode }) {
             </kbd>
           </button>
           <div className="ml-auto flex items-center gap-2">
+            <Link to="/leads/add" className="hidden sm:inline-flex">
+              <Button size="sm">Add lead</Button>
+            </Link>
             <PipButton mode="capture" label="PiP Add" className="hidden sm:inline-flex" />
             <PipButton mode="manage" label="PiP Manage" className="hidden sm:inline-flex" />
             <PipButton />
