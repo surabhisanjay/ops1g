@@ -3,14 +3,13 @@
   "private": true,
   "sideEffects": false,
   "type": "module",
-  
   "scripts": {
-  "dev": "vite dev",
-  "build": "vinxi build",
-  "start": "vinxi start",
-  "lint": "eslint .",
-  "format": "prettier --write ."
-},
+    "dev": "vite dev",
+    "build": "vinxi build",
+    "start": "vinxi start",
+    "lint": "eslint .",
+    "format": "prettier --write ."
+  },
   "dependencies": {
     "@cloudflare/vite-plugin": "^1.25.5",
     "@hookform/resolvers": "^5.2.2",
@@ -69,6 +68,7 @@
     "tailwindcss": "^4.2.1",
     "tw-animate-css": "^1.3.4",
     "vaul": "^1.1.2",
+    "vinxi": "^0.5.11",
     "vite-tsconfig-paths": "^6.0.2",
     "wouter": "^3.3.5",
     "xlsx": "^0.18.5",
@@ -93,6 +93,4 @@
     "typescript-eslint": "^8.56.1",
     "vite": "^7.3.1"
   }
- 
 }
-
