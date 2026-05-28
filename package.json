@@ -5,7 +5,7 @@
   "type": "module",
   
   "scripts": {
-  "dev": "vinxi dev",
+  "dev": "vite dev",
   "build": "vinxi build",
   "start": "vinxi start",
   "lint": "eslint .",
