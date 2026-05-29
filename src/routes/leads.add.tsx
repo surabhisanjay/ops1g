@@ -3,6 +3,7 @@ import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { DirectLeadForm } from "@/components/leads/DirectLeadForm";
 import { QuickAddLeadPanel } from "@/components/leads/QuickAddLeadPanel";
+import { BulkPasteImport } from "@/components/leads/BulkPasteImport";
 import { RequestAccessSheet } from "@/components/leads/RequestAccessSheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -39,6 +40,7 @@ function AddLeadPage() {
             <TabsTrigger value="quick">Quick Add</TabsTrigger>
             <TabsTrigger value="single">Single lead</TabsTrigger>
             <TabsTrigger value="geo">Geo-intelligence</TabsTrigger>
+            <TabsTrigger value="bulk">Bulk paste</TabsTrigger>
             <TabsTrigger value="requests">Access requests</TabsTrigger>
           </TabsList>
           <TabsContent value="quick">
@@ -53,6 +55,7 @@ function AddLeadPage() {
             </div>
           </TabsContent>
           <TabsContent value="single"><DirectLeadForm /></TabsContent>
+          <TabsContent value="bulk"><BulkPasteImport /></TabsContent>
           <TabsContent value="geo"><GeoIntelligenceGuide /></TabsContent>
           <TabsContent value="requests"><RequestAccessSheet /></TabsContent>
         </Tabs>

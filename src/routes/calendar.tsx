@@ -33,7 +33,10 @@ import { AgendaView } from "@/components/calendar/AgendaView";
 import { EventDialog } from "@/components/calendar/EventDialog";
 import { SyncPanel } from "@/components/calendar/SyncPanel";
 import { headerLabel, navigate, type CalendarView } from "@/components/calendar/CalendarUtils";
+import { LiveTourStatusBar } from "@/components/LiveTourStatusBar";
+import { tourLiveStatus, TOUR_LIVE_LABEL } from "@/lib/engine";
 import { format } from "date-fns";
+import { useMountedNow } from "@/hooks/use-now";
 
 export const Route = createFileRoute("/calendar")({
   component: CalendarPage,
@@ -42,6 +45,7 @@ export const Route = createFileRoute("/calendar")({
 function CalendarPage() {
   const { tours, followUps, leads } = useApp();
   const { events, addEvent } = useCalendar();
+  const [now] = useMountedNow();
   const [view, setView] = useState<CalendarView>("week");
   const [focus, setFocus] = useState<Date>(new Date());
   const [selectedDay, setSelectedDay] = useState<Date | undefined>(new Date());
@@ -59,15 +63,17 @@ function CalendarPage() {
       const lead = leadMap.get(t.leadId);
       const start = new Date(t.scheduledAt);
       const end = new Date(start.getTime() + 60 * 60 * 1000);
+      const live = TOUR_LIVE_LABEL[tourLiveStatus(t, now)];
       out.push({
         id: `crm-tour-${t.id}`,
-        title: lead ? `Tour · ${lead.name}` : "Tour",
+        title: lead ? `Tour · ${lead.name} · ${live}` : `Tour · ${live}`,
         kind: "tour",
         start: start.toISOString(),
         end: end.toISOString(),
         allDay: false,
         leadId: t.leadId,
         tourId: t.id,
+        description: `CRM status: ${t.status} · ${live}`,
         externalSource: "local",
         createdAt: t.createdAt,
         updatedAt: t.updatedAt,
@@ -94,7 +100,7 @@ function CalendarPage() {
       });
     }
     return out;
-  }, [tours, followUps, leads]);
+  }, [tours, followUps, leads, now]);
 
   const allEvents = useMemo(() => {
     const merged = [...crmEvents, ...events];
@@ -202,6 +208,8 @@ function CalendarPage() {
             </Button>
           </div>
         </div>
+
+        <LiveTourStatusBar />
 
         {/* Sub-toolbar */}
         <div className="flex items-center justify-between gap-3 flex-wrap">

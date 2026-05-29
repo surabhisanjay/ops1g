@@ -3,6 +3,9 @@ import { AppShell } from "@/components/AppShell";
 import { useApp } from "@/lib/store";
 import { useMemo } from "react";
 import { MapPin, TrendingUp, TrendingDown, AlertCircle } from "lucide-react";
+import { LiveTourStatusBar } from "@/components/LiveTourStatusBar";
+import { tourLiveStatus } from "@/lib/engine";
+import { useMountedNow } from "@/hooks/use-now";
 
 export const Route = createFileRoute("/heatmap")({
   head: () => ({
@@ -19,6 +22,8 @@ interface AreaRow {
   leads: number;
   hotLeads: number;
   tours: number;
+  liveTours: number;
+  pendingPostTour: number;
   bookings: number;
   conversion: number;
   avgBudget: number;
@@ -31,6 +36,7 @@ interface AreaRow {
 
 function HeatmapPage() {
   const { leads, tours, properties, bookings } = useApp();
+  const [now] = useMountedNow();
 
   const rows = useMemo<AreaRow[]>(() => {
     const areas = new Set<string>();
@@ -49,6 +55,11 @@ function HeatmapPage() {
         return prop?.area.toLowerCase() === area.toLowerCase();
       }).length;
       const completedTours = areaTours.filter((t) => t.status === "completed").length;
+      const liveTours = areaTours.filter((t) => {
+        const s = tourLiveStatus(t, now);
+        return s === "live" || s === "upcoming" || s === "late";
+      }).length;
+      const pendingPostTour = areaTours.filter((t) => t.status === "completed" && !t.postTour.filledAt).length;
       const conversion = completedTours > 0 ? Math.round((areaBookings / completedTours) * 100) : 0;
       const totalBeds = areaProps.reduce((s, p) => s + p.totalBeds, 0);
       const vacantBeds = areaProps.reduce((s, p) => s + p.vacantBeds, 0);
@@ -75,9 +86,12 @@ function HeatmapPage() {
       }
 
       const pressure = Math.min(100, Math.round((demand / Math.max(1, supply)) * 50));
-      return { area, leads: demand, hotLeads, tours: completedTours, bookings: areaBookings, conversion, avgBudget, totalBeds, vacantBeds, occupancyPct: occupancy, insight, pressure };
+      return {
+        area, leads: demand, hotLeads, tours: completedTours, liveTours, pendingPostTour,
+        bookings: areaBookings, conversion, avgBudget, totalBeds, vacantBeds, occupancyPct: occupancy, insight, pressure,
+      };
     }).sort((a, b) => b.pressure - a.pressure);
-  }, [leads, tours, properties, bookings]);
+  }, [leads, tours, properties, bookings, now]);
 
   return (
     <AppShell>
@@ -90,6 +104,8 @@ function HeatmapPage() {
             Where the market is hot and where you're leaking. Strategic, not operational.
           </p>
         </header>
+
+        <LiveTourStatusBar />
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
           {rows.map((r) => {
@@ -117,7 +133,9 @@ function HeatmapPage() {
 
                 <div className="grid grid-cols-3 gap-2 text-[11px]">
                   <Stat label="Leads" value={r.leads} hot={r.hotLeads} />
-                  <Stat label="Tours" value={r.tours} />
+                  <Stat label="Live tours" value={r.liveTours} accent={r.liveTours > 0} />
+                  <Stat label="Post-tour" value={r.pendingPostTour} warn={r.pendingPostTour > 0} />
+                  <Stat label="Done tours" value={r.tours} />
                   <Stat label="Booked" value={r.bookings} mono />
                   <Stat label="Conv %" value={`${r.conversion}%`} mono />
                   <Stat label="Vacant" value={`${r.vacantBeds}/${r.totalBeds}`} mono />
@@ -143,11 +161,15 @@ function HeatmapPage() {
   );
 }
 
-function Stat({ label, value, mono, hot }: { label: string; value: string | number; mono?: boolean; hot?: number }) {
+function Stat({
+  label, value, mono, hot, accent, warn,
+}: {
+  label: string; value: string | number; mono?: boolean; hot?: number; accent?: boolean; warn?: boolean;
+}) {
   return (
     <div className="rounded-md bg-background/60 px-2 py-1.5">
       <div className="text-[9px] uppercase tracking-wider text-muted-foreground">{label}</div>
-      <div className={`text-xs font-medium ${mono ? "font-mono" : ""}`}>
+      <div className={`text-xs font-medium ${mono ? "font-mono" : ""} ${accent ? "text-accent" : ""} ${warn ? "text-destructive" : ""}`}>
         {value}
         {hot !== undefined && hot > 0 && <span className="ml-1 text-destructive font-mono text-[10px]">·{hot}🔥</span>}
       </div>
