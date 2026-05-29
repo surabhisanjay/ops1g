@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Target, CalendarPlus, ClipboardList, Boxes, Activity,
   Building2, Search, Sun, Command, Trophy, Sparkles, MessageSquare,
   IndianRupee, MapPin, Zap, Users, Home, Calendar, Store, Swords, Settings, AlertTriangle,
-  ShieldCheck, Inbox, Camera, HelpCircle, Layers, HeartPulse,
+  ShieldCheck, Inbox, Camera, HelpCircle, Layers, HeartPulse, LayoutGrid,
 } from "lucide-react";
 import { NotificationCenter } from "./NotificationCenter";
 import { ProfileMenu } from "./ProfileMenu";
@@ -115,6 +115,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       { to: "/myt/war-room", label: "War Room", icon: Swords, accent: true },
       { to: "/myt/team", label: "Team", icon: Users },
       { to: "/revenue", label: "Revenue", icon: IndianRupee },
+      { to: "/heatmap", label: "Heatmap", icon: LayoutGrid },
       { to: "/myt/funnel", label: "Funnel", icon: Activity },
       { to: "/myt/zones", label: "Zones", icon: MapPin },
       { to: "/myt/owners-compare", label: "Owners", icon: ShieldCheck },
@@ -127,6 +128,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       { to: "/myt/leads", label: "CRM leads", icon: Target },
       { to: "/myt/schedule", label: "Schedule", icon: CalendarPlus },
       { to: "/calendar", label: "Calendar", icon: Calendar },
+      { to: "/heatmap", label: "Heatmap", icon: LayoutGrid },
       { to: "/myt/marketplace", label: "Marketplace", icon: Store },
       { to: "/supply-hub", label: "Supply Hub", icon: Layers },
       { to: "/sequences", label: "Outreach", icon: Zap },
