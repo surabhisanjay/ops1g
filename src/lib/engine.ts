@@ -83,6 +83,98 @@ export function intentFor(confidence: number): Intent {
   return "cold";
 }
 
+export interface ScoreFactor {
+  label: string;
+  delta: number;
+}
+
+/** Human-readable breakdown matching {@link liveConfidence}. */
+export function liveConfidenceBreakdown(lead: Lead, tours: Tour[], now: number) {
+  const factors: ScoreFactor[] = [];
+  const base = lead.confidence;
+
+  const silentHrs = (now - +new Date(lead.updatedAt)) / 36e5;
+  if (silentHrs > 6) {
+    const d = Math.min(20, Math.floor(silentHrs - 6));
+    if (d) factors.push({ label: `${Math.round(silentHrs)}h since last touch`, delta: -d });
+  }
+  if (!lead.nextFollowUpAt) factors.push({ label: "No follow-up scheduled", delta: -5 });
+  if (lead.responseSpeedMins <= 5) factors.push({ label: "Fast first response (≤5m)", delta: 5 });
+  else if (lead.responseSpeedMins > 15) factors.push({ label: "Slow first response (>15m)", delta: -4 });
+
+  const days = (+new Date(lead.moveInDate) - now) / (24 * 36e5);
+  if (days < 0) factors.push({ label: "Move-in date passed", delta: -8 });
+  else if (days <= 3) factors.push({ label: "Move-in within 3 days", delta: 6 });
+  else if (days >= 14) factors.push({ label: "Move-in 14+ days out", delta: -3 });
+
+  if (tours.some((t) => t.leadId === lead.id && t.status === "completed")) {
+    factors.push({ label: "Tour completed", delta: 8 });
+  }
+  if (lead.stage === "dropped") factors.push({ label: "Dropped stage cap", delta: 0 });
+  if (tours.some((t) => t.leadId === lead.id && t.decision === "booked") || lead.stage === "booked") {
+    factors.push({ label: "Booked — score locked", delta: 0 });
+  }
+
+  return { base, score: liveConfidence(lead, tours, now), factors };
+}
+
+/* ============== LIVE TOUR STATUS ============== */
+
+export type TourLiveStatus =
+  | "upcoming"
+  | "live"
+  | "late"
+  | "needs-form"
+  | "done"
+  | "cancelled"
+  | "no-show";
+
+export function tourLiveStatus(tour: Tour, now: number): TourLiveStatus {
+  if (tour.status === "cancelled") return "cancelled";
+  if (tour.status === "no-show") return "no-show";
+  if (tour.status === "completed") return tour.postTour.filledAt ? "done" : "needs-form";
+  const start = +new Date(tour.scheduledAt);
+  const end = start + 60 * 60 * 1000;
+  if (now > end) return "late";
+  if (now >= start - 10 * 60 * 1000) return "live";
+  return "upcoming";
+}
+
+export const TOUR_LIVE_LABEL: Record<TourLiveStatus, string> = {
+  upcoming: "Upcoming",
+  live: "Live now",
+  late: "Late / confirm",
+  "needs-form": "Post-tour pending",
+  done: "Closed",
+  cancelled: "Cancelled",
+  "no-show": "No-show",
+};
+
+/* ============== MRR PIPELINE FUNNEL ============== */
+
+const PIPELINE_STAGES: Lead["stage"][] = [
+  "new", "contacted", "tour-scheduled", "tour-done", "negotiation", "booked",
+];
+
+export interface MrrFunnelRow {
+  stage: Lead["stage"];
+  count: number;
+  mrrPotential: number;
+}
+
+/** Active pipeline MRR by stage (sum of monthly budgets at or past each stage). */
+export function mrrPipelineFunnel(leads: Lead[]): MrrFunnelRow[] {
+  const active = leads.filter((l) => l.stage !== "dropped");
+  return PIPELINE_STAGES.map((stage, i) => {
+    const atOrPast = active.filter((l) => PIPELINE_STAGES.indexOf(l.stage) >= i);
+    return {
+      stage,
+      count: atOrPast.length,
+      mrrPotential: atOrPast.reduce((s, l) => s + l.budget, 0),
+    };
+  });
+}
+
 /* ============== SMART "DO NEXT" QUEUE ============== */
 
 export interface NextAction {

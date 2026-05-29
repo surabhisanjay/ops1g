@@ -26,8 +26,10 @@ import {
   Phone, MessageSquare, Calendar as CalendarIcon, Tag, ClipboardCheck,
   AlertTriangle, CheckCircle2, X, Activity as ActivityIcon, MapPin,
   Wallet, Send, Zap, IndianRupee, BellRing, ExternalLink, Plus,
-  Building2, Video, Briefcase,
+  Building2, Video, Briefcase, HelpCircle, Clock,
 } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { liveConfidenceBreakdown, intentFor } from "@/lib/engine";
 import { format, formatDistanceToNow } from "date-fns";
 import type { Lead, LeadStage, FollowUpPriority, SequenceKind } from "@/lib/types";
 import { toast } from "sonner";
@@ -70,7 +72,7 @@ type DrawerScheduleAnswers = {
 
 export function LeadControlPanel() {
   const {
-    selectedLeadId, selectLead, leads, properties, tours, activities, tcms,
+    selectedLeadId, selectLead, leads, properties, tours, activities, tcms, followUps,
     setLeadStage, setLeadIntent, setLeadFollowUp, addLeadTag, removeLeadTag,
     scheduleTour, cancelTour, rescheduleTour, completeTour, setDecision, updatePostTour,
     addNote, logCall, sendMessage, autoAssignLead, startSequence, closeDeal,
@@ -116,7 +118,7 @@ export function LeadControlPanel() {
     tourType: "physical",
   });
   const [tab, setTab] = useState("control");
-  const [, mounted] = useMountedNow();
+  const [now, mounted] = useMountedNow();
 
   // Note state
   const [note, setNote] = useState("");
@@ -143,9 +145,36 @@ export function LeadControlPanel() {
     setTab(pendingPostTour ? "post" : upcomingTour ? "tour" : settings.matching.drawerDefaultTab);
   }, [lead, pendingPostTour, upcomingTour, settings.matching.drawerDefaultTab]);
 
+  const scoreBreakdown = useMemo(
+    () => (lead ? liveConfidenceBreakdown(lead, leadTours, now) : null),
+    [lead, leadTours, now],
+  );
+  const liveScore = scoreBreakdown?.score ?? lead?.confidence ?? 0;
+  const liveIntent = intentFor(liveScore);
+
+  const overdueFollowUps = useMemo(
+    () => followUps.filter((f) => !f.done && +new Date(f.dueAt) < now),
+    [followUps, now],
+  );
+
   if (!lead) return null;
 
   const tcm = getTcm(lead.assignedTcmId);
+
+  const bumpAllOverdue = () => {
+    const slot = new Date(now);
+    slot.setDate(slot.getDate() + 1);
+    slot.setHours(10, 0, 0, 0);
+    const iso = slot.toISOString();
+    let n = 0;
+    for (const f of overdueFollowUps) {
+      const l = leads.find((x) => x.id === f.leadId);
+      if (!l) continue;
+      setLeadFollowUp(l.id, iso, "high", `Rescheduled: ${f.reason}`);
+      n++;
+    }
+    toast.success(`Rescheduled ${n} overdue follow-up${n === 1 ? "" : "s"} to tomorrow 10:00`);
+  };
 
   const handleSchedule = () => {
     if (!propertyId || !tcmId || !scheduledAt) {
@@ -188,8 +217,43 @@ export function LeadControlPanel() {
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <StageBadge stage={lead.stage} />
-            <IntentChip intent={lead.intent} />
-            <ConfidenceBar value={lead.confidence} />
+            <IntentChip intent={mounted ? liveIntent : lead.intent} />
+            <ConfidenceBar value={mounted ? liveScore : lead.confidence} />
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  className="h-6 w-6 rounded-md border border-border hover:bg-muted flex items-center justify-center text-muted-foreground"
+                  aria-label="How is this score calculated?"
+                >
+                  <HelpCircle className="h-3.5 w-3.5" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="w-80 text-xs space-y-2">
+                <div className="font-semibold text-sm">Live deal score</div>
+                <p className="text-muted-foreground">
+                  Base {scoreBreakdown?.base ?? lead.confidence} → live{" "}
+                  <span className="font-mono text-foreground">{liveScore}</span>
+                  {" "}({liveIntent})
+                </p>
+                <ul className="space-y-1">
+                  {(scoreBreakdown?.factors ?? []).map((f) => (
+                    <li key={f.label} className="flex justify-between gap-2">
+                      <span className="text-muted-foreground">{f.label}</span>
+                      <span className={`font-mono tabular-nums ${f.delta >= 0 ? "text-success" : "text-destructive"}`}>
+                        {f.delta >= 0 ? "+" : ""}{f.delta}
+                      </span>
+                    </li>
+                  ))}
+                  {(scoreBreakdown?.factors.length ?? 0) === 0 && (
+                    <li className="text-muted-foreground">No adjustments — base score holds.</li>
+                  )}
+                </ul>
+                <p className="text-[10px] text-muted-foreground border-t border-border pt-2">
+                  Silence, missing follow-ups, and move-in timing decay the score. Completed tours and fast responses boost it.
+                </p>
+              </PopoverContent>
+            </Popover>
             <ObjectionTag leadId={lead.id} />
           </div>
           <div className="grid grid-cols-3 gap-2 pt-1 text-xs">
@@ -246,6 +310,41 @@ export function LeadControlPanel() {
             {/* CONTROL — status, intent, follow-up, action engine, notes, tags */}
             <TabsContent value="control" className="space-y-4 pt-4">
               <SequenceChip leadId={lead.id} />
+
+              {overdueFollowUps.length > 0 && (
+                <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 space-y-2">
+                  <div className="flex items-start gap-2">
+                    <Clock className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-semibold text-destructive">
+                        {overdueFollowUps.length} overdue follow-up{overdueFollowUps.length > 1 ? "s" : ""} on your team
+                      </div>
+                      <div className="text-[11px] text-muted-foreground mt-0.5">
+                        Bulk-reschedule every overdue item to tomorrow 10:00, or open each lead from the list below.
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 max-h-20 overflow-y-auto">
+                    {overdueFollowUps.slice(0, 8).map((f) => {
+                      const l = leads.find((x) => x.id === f.leadId);
+                      if (!l) return null;
+                      return (
+                        <button
+                          key={f.id}
+                          type="button"
+                          onClick={() => selectLead(l.id)}
+                          className="text-[10px] rounded-md border border-destructive/30 bg-card px-2 py-0.5 hover:bg-destructive/10"
+                        >
+                          {l.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <Button size="sm" variant="destructive" className="w-full h-8" onClick={bumpAllOverdue}>
+                    Bump all overdue to tomorrow
+                  </Button>
+                </div>
+              )}
 
               <Section title="Routing">
                 <div className="flex gap-2">

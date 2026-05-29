@@ -1,12 +1,16 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { parseLead, splitLeads } from "@/lib/lead-identity/parser";
 import { useIdentityStore } from "@/lib/lead-identity/store";
+import { useApp } from "@/lib/store";
+import { useMountedNow } from "@/hooks/use-now";
 import type { MatchResult, ParsedLeadDraft } from "@/lib/lead-identity/types";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { ListPlus, ShieldCheck } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ListPlus, ShieldCheck, Clock } from "lucide-react";
 import { toast } from "sonner";
+import { formatDistanceToNow } from "date-fns";
 
 interface Row {
   draft: ParsedLeadDraft;
@@ -23,8 +27,21 @@ const matchColor = (t: MatchResult["type"]) =>
 export function BulkPasteImport() {
   const checkDuplicates = useIdentityStore((s) => s.checkDuplicates);
   const createLead = useIdentityStore((s) => s.createLead);
+  const { leads, followUps, setLeadFollowUp, selectLead } = useApp();
+  const [now] = useMountedNow();
   const [raw, setRaw] = useState("");
   const [rows, setRows] = useState<Row[]>([]);
+  const [overdueSelected, setOverdueSelected] = useState<Set<string>>(new Set());
+
+  const overdueItems = useMemo(() => {
+    return followUps
+      .filter((f) => !f.done && +new Date(f.dueAt) < now)
+      .map((f) => {
+        const lead = leads.find((l) => l.id === f.leadId);
+        return lead ? { followUp: f, lead } : null;
+      })
+      .filter((x): x is NonNullable<typeof x> => !!x);
+  }, [followUps, leads, now]);
 
   const onParse = () => {
     const chunks = splitLeads(raw);
@@ -52,8 +69,95 @@ export function BulkPasteImport() {
   const toggle = (i: number) =>
     setRows((rs) => rs.map((r, idx) => idx === i ? { ...r, selected: !r.selected } : r));
 
+  const toggleOverdue = (leadId: string) => {
+    setOverdueSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(leadId)) next.delete(leadId);
+      else next.add(leadId);
+      return next;
+    });
+  };
+
+  const selectAllOverdue = () => {
+    setOverdueSelected(new Set(overdueItems.map((x) => x.lead.id)));
+  };
+
+  const bumpSelectedOverdue = () => {
+    const slot = new Date(now);
+    slot.setDate(slot.getDate() + 1);
+    slot.setHours(10, 0, 0, 0);
+    const iso = slot.toISOString();
+    let n = 0;
+    for (const { lead, followUp } of overdueItems) {
+      if (!overdueSelected.has(lead.id)) continue;
+      setLeadFollowUp(lead.id, iso, "high", `Bulk reschedule: ${followUp.reason}`);
+      n++;
+    }
+    toast.success(`Rescheduled ${n} overdue follow-up${n === 1 ? "" : "s"}`);
+    setOverdueSelected(new Set());
+  };
+
   return (
     <div className="space-y-3">
+      {overdueItems.length > 0 && (
+        <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 space-y-3">
+          <h3 className="font-semibold text-sm flex items-center gap-2 text-destructive">
+            <Clock className="h-4 w-4" /> Overdue leads · bulk reschedule
+          </h3>
+          <p className="text-xs text-muted-foreground">
+            {overdueItems.length} follow-up{overdueItems.length > 1 ? "s" : ""} past due. Select leads and bump to tomorrow 10:00.
+          </p>
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" onClick={selectAllOverdue}>Select all</Button>
+            <Button
+              size="sm"
+              variant="destructive"
+              disabled={overdueSelected.size === 0}
+              onClick={bumpSelectedOverdue}
+            >
+              Bump {overdueSelected.size || "selected"} to tomorrow
+            </Button>
+          </div>
+          <div className="rounded-lg border border-border bg-card overflow-hidden max-h-48 overflow-y-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/40 text-[10px] uppercase tracking-wider text-muted-foreground">
+                <tr>
+                  <th className="text-left px-3 py-2 w-10" />
+                  <th className="text-left px-3 py-2">Lead</th>
+                  <th className="text-left px-3 py-2">Reason</th>
+                  <th className="text-left px-3 py-2">Overdue</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {overdueItems.map(({ lead, followUp }) => (
+                  <tr key={followUp.id} className="hover:bg-muted/20">
+                    <td className="px-3 py-2">
+                      <Checkbox
+                        checked={overdueSelected.has(lead.id)}
+                        onCheckedChange={() => toggleOverdue(lead.id)}
+                      />
+                    </td>
+                    <td className="px-3 py-2">
+                      <button
+                        type="button"
+                        className="font-medium hover:text-primary text-left"
+                        onClick={() => selectLead(lead.id)}
+                      >
+                        {lead.name}
+                      </button>
+                    </td>
+                    <td className="px-3 py-2 text-xs text-muted-foreground">{followUp.reason}</td>
+                    <td className="px-3 py-2 text-xs font-mono text-destructive">
+                      {formatDistanceToNow(new Date(followUp.dueAt), { addSuffix: true })}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       <div className="rounded-xl border border-border bg-card p-4 space-y-3">
         <h3 className="font-semibold text-sm flex items-center gap-2">
           <ListPlus className="h-4 w-4 text-primary" /> Bulk paste

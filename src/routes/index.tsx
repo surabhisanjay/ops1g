@@ -6,7 +6,7 @@ import { format } from "date-fns";
 import { AlertTriangle, ArrowUpRight, CalendarPlus, Flame, Building2, Zap, Sun, TrendingUp, Sparkles, IndianRupee } from "lucide-react";
 import { useMemo } from "react";
 import { useMountedNow } from "@/hooks/use-now";
-import { buildDoNextQueue, liveConfidence, intentFor } from "@/lib/engine";
+import { buildDoNextQueue, liveConfidence, intentFor, mrrPipelineFunnel } from "@/lib/engine";
 import { scanRevivals } from "@/lib/revival";
 import { QuickActionRow } from "@/components/QuickActionRow";
 
@@ -48,6 +48,11 @@ function DashboardPage() {
   const overdueFu = followUps.filter((f) => !f.done && +new Date(f.dueAt) < now).length;
   const monthlyRevenue = bookings.reduce((s, b) => s + b.amount, 0);
   const unreadHandoffs = handoffs.filter((h) => !h.read && h.to === role).length;
+  const mrrFunnel = useMemo(() => mrrPipelineFunnel(liveLeads), [liveLeads]);
+  const maxFunnelMrr = useMemo(
+    () => Math.max(1, ...mrrFunnel.map((r) => r.mrrPotential)),
+    [mrrFunnel],
+  );
 
   return (
     <AppShell>
@@ -116,6 +121,41 @@ function DashboardPage() {
               })}
             </div>
           )}
+        </section>
+
+        <section className="rounded-xl border border-border bg-card overflow-hidden">
+          <header className="flex items-center justify-between px-4 py-3 border-b border-border">
+            <div className="flex items-center gap-2">
+              <IndianRupee className="h-4 w-4 text-success" />
+              <h2 className="font-display text-sm font-semibold">MRR pipeline funnel</h2>
+              <span className="text-[10px] text-muted-foreground font-mono">
+                ₹{((mrrFunnel[0]?.mrrPotential ?? 0) / 1000).toFixed(0)}k top-of-funnel
+              </span>
+            </div>
+            <Link to="/revenue" className="text-xs text-accent inline-flex items-center gap-1">
+              Revenue <ArrowUpRight className="h-3 w-3" />
+            </Link>
+          </header>
+          <div className="p-4 space-y-2">
+            {mrrFunnel.map((row) => {
+              const label = row.stage.replace(/-/g, " ");
+              const width = Math.round((row.mrrPotential / maxFunnelMrr) * 100);
+              return (
+                <div key={row.stage} className="grid grid-cols-12 items-center gap-2 text-xs">
+                  <div className="col-span-3 capitalize font-medium truncate">{label}</div>
+                  <div className="col-span-6 h-2 rounded-full bg-muted overflow-hidden">
+                    <div
+                      className="h-full bg-success/80 rounded-full transition-all"
+                      style={{ width: `${width}%` }}
+                    />
+                  </div>
+                  <div className="col-span-3 text-right font-mono text-[11px] tabular-nums">
+                    {row.count} · ₹{(row.mrrPotential / 1000).toFixed(0)}k
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </section>
 
         {/* Post-tour enforcement banner */}
